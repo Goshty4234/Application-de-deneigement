@@ -1,0 +1,8 @@
+Flask==3.0.0
+Flask-CORS==4.0.0
+python-dotenv==1.0.0
+Werkzeug==3.0.1
+# Optionnel - seulement si vous voulez utiliser Twilio/SendGrid
+# twilio==8.10.0
+# sendgrid==6.11.0
+

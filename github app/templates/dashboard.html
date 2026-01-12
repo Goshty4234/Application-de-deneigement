@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gestion Déneigement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FullCalendar CSS -->
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
+    <!-- FullCalendar JS -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <!-- Chart.js pour les graphiques -->
+    <script src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'></script>
+    <style>
+        .status-planifie { @apply bg-blue-100 text-blue-800; }
+        .status-en_route { @apply bg-yellow-100 text-yellow-800; }
+        .status-commence { @apply bg-orange-100 text-orange-800; }
+        .status-termine { @apply bg-green-100 text-green-800; }
+        
+        body {
+            background-image: url('/Images/Image tracteur nuit 1.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+        
+        .overlay {
+            background: rgba(0, 0, 0, 0.4);
+            min-height: 100vh;
+        }
+        
+        .content-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Style pour le calendrier */
+        #calendar {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .fc-event {
+            cursor: pointer;
+        }
+        
+        .fc-event-title {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="content-card rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Dashboard Déneigement</h1>
+            <p class="text-gray-600">Gérez vos clients et interventions</p>
+        </div>
+
+        <!-- Boutons de navigation et filtres -->
+        <div class="mb-6">
+            <div class="flex flex-wrap gap-3 items-center mb-4">
+                <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition">
+                    + Ajouter un client
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="showView('stats')" id="btnStats" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition">
+                        📊 Statistiques
+                    </button>
+                    <button onclick="showView('map')" id="btnMap" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition">
+                        🗺️ Carte Globale
+                    </button>
+                    <button onclick="showView('calendar')" id="btnCalendar" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition">
+                        📅 Calendrier
+                    </button>
+                    <button onclick="showView('table')" id="btnTable" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition">
+                        📋 Tableau
+                    </button>
+                    <button onclick="exportPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition">
+                        📄 Export PDF
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Barre de recherche et filtres -->
+            <div class="content-card rounded-lg shadow-md p-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">🔍 Recherche</label>
+                        <input type="text" id="searchInput" placeholder="Nom, adresse, téléphone..." 
+                               onkeyup="filterClients()" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">📊 Statut</label>
+                        <select id="filterStatus" onchange="filterClients()" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Tous les statuts</option>
+                            <option value="planifié">Planifié</option>
+                            <option value="en_route">En route</option>
+                            <option value="commence">Commencé</option>
+                            <option value="termine">Terminé</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">🔧 Type de service</label>
+                        <select id="filterTypeService" onchange="filterClients()" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Tous les types</option>
+                            <option value="Déneigement résidentiel">Déneigement résidentiel</option>
+                            <option value="Déneigement commercial">Déneigement commercial</option>
+                            <option value="Déneigement industriel">Déneigement industriel</option>
+                            <option value="Déneigement urgent">Déneigement urgent</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">📅 Date</label>
+                        <input type="date" id="filterDate" onchange="filterClients()" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button onclick="clearFilters()" class="text-sm text-gray-600 hover:text-gray-800">
+                        ✖️ Effacer les filtres
+                    </button>
+                    <span id="filterCount" class="ml-4 text-sm text-gray-600"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vue Statistiques -->
+        <div id="statsView" class="mb-6 hidden">
+            <div class="content-card rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">📊 Statistiques & Analytics</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+                        <div class="text-sm text-gray-600">Total Clients</div>
+                        <div class="text-3xl font-bold text-blue-600" id="statTotal">0</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                        <div class="text-sm text-gray-600">Terminés</div>
+                        <div class="text-3xl font-bold text-green-600" id="statTermines">0</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-500">
+                        <div class="text-sm text-gray-600">En Cours</div>
+                        <div class="text-3xl font-bold text-yellow-600" id="statEnCours">0</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
+                        <div class="text-sm text-gray-600">Aujourd'hui</div>
+                        <div class="text-3xl font-bold text-purple-600" id="statAujourdhui">0</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Répartition par Statut</h3>
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Répartition par Type de Service</h3>
+                        <canvas id="serviceChart"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Interventions des 7 derniers jours</h3>
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">Taux de Complétion</h3>
+                        <canvas id="completionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vue Carte Globale -->
+        <div id="mapView" class="mb-6 hidden">
+            <div class="content-card rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🗺️ Carte Globale - Tous les Clients</h2>
+                <div class="mb-4 flex gap-2">
+                    <button onclick="showMapForDate('today')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                        Aujourd'hui
+                    </button>
+                    <button onclick="showMapForDate('all')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">
+                        Tous
+                    </button>
+                    <input type="date" id="mapDateFilter" onchange="showMapForDate('custom')" class="px-4 py-2 border rounded">
+                </div>
+                <div id="globalMap" style="width: 100%; height: 600px; border-radius: 8px; overflow: hidden;"></div>
+            </div>
+        </div>
+
+        <!-- Vue Calendrier -->
+        <div id="calendarView" class="mb-6 hidden">
+            <div class="content-card rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Calendrier des Interventions</h2>
+                <div id="calendar"></div>
+            </div>
+        </div>
+
+        <!-- Vue Tableau -->
+        <div id="tableView">
+        <!-- Tableau des clients -->
+        <div class="content-card rounded-lg shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adresse</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type de service</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date/Heure</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientsTable" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Modal Carte Google Maps -->
+    <div id="mapModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="content-card rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="mapTitle" class="text-2xl font-bold text-gray-800">Carte</h2>
+                <button onclick="closeMapModal()" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+            </div>
+            <div id="mapContainer" class="w-full h-96 rounded-lg overflow-hidden">
+                <iframe id="mapFrame" 
+                        width="100%" 
+                        height="100%" 
+                        style="border:0" 
+                        loading="lazy" 
+                        allowfullscreen
+                        referrerpolicy="no-referrer-when-downgrade">
+                </iframe>
+            </div>
+            <div class="mt-4">
+                <a id="mapLink" href="#" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                    Ouvrir dans Google Maps →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ajouter/Modifier Client -->
+    <div id="clientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="content-card rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-4">Ajouter un client</h2>
+            <form id="clientForm" onsubmit="saveClient(event)">
+                <input type="hidden" id="clientId">
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Nom *</label>
+                    <input type="text" id="nom" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Adresse *</label>
+                    <input type="text" id="adresse" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Téléphone *</label>
+                    <input type="tel" id="telephone" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Email</label>
+                    <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Date intervention *</label>
+                    <input type="date" id="date_intervention" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Heure début *</label>
+                    <input type="time" id="heure_debut" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Heure fin (optionnel)</label>
+                    <input type="time" id="heure_fin" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Type de service</label>
+                    <select id="type_service" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Sélectionner un type</option>
+                        <option value="Déneigement résidentiel">Déneigement résidentiel</option>
+                        <option value="Déneigement commercial">Déneigement commercial</option>
+                        <option value="Déneigement industriel">Déneigement industriel</option>
+                        <option value="Déneigement urgent">Déneigement urgent</option>
+                        <option value="Autre">Autre</option>
+                    </select>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+                        Enregistrer
+                    </button>
+                    <button type="button" onclick="closeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition">
+                        Annuler
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let clients = [];
+        let filteredClients = [];
+        let calendar = null;
+        let currentView = 'table'; // 'table', 'calendar', 'stats', 'map'
+        let statusChart = null;
+        let serviceChart = null;
+        let dailyChart = null;
+        let completionChart = null;
+
+        // Charger les clients au démarrage
+        async function loadClients() {
+            try {
+                const response = await fetch('/api/clients');
+                clients = await response.json();
+                renderClients();
+                if (calendar) {
+                    updateCalendar();
+                }
+                if (currentView === 'stats') {
+                    updateStats();
+                }
+                if (currentView === 'stats') {
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Erreur chargement clients:', error);
+            }
+        }
+
+        // Basculer entre les vues
+        function showView(view) {
+            currentView = view;
+            
+            // Cacher toutes les vues
+            document.getElementById('statsView')?.classList.add('hidden');
+            document.getElementById('mapView')?.classList.add('hidden');
+            document.getElementById('calendarView')?.classList.add('hidden');
+            document.getElementById('tableView')?.classList.add('hidden');
+            
+            // Réinitialiser tous les boutons
+            document.getElementById('btnStats')?.classList.remove('bg-green-700');
+            document.getElementById('btnStats')?.classList.add('bg-green-600');
+            document.getElementById('btnMap')?.classList.remove('bg-red-700');
+            document.getElementById('btnMap')?.classList.add('bg-red-600');
+            document.getElementById('btnCalendar')?.classList.remove('bg-purple-700');
+            document.getElementById('btnCalendar')?.classList.add('bg-purple-600');
+            document.getElementById('btnTable')?.classList.remove('bg-gray-700');
+            document.getElementById('btnTable')?.classList.add('bg-gray-600');
+            
+            if (view === 'stats') {
+                document.getElementById('statsView')?.classList.remove('hidden');
+                document.getElementById('btnStats')?.classList.add('bg-green-700');
+                document.getElementById('btnStats')?.classList.remove('bg-green-600');
+                updateStats();
+            } else if (view === 'map') {
+                document.getElementById('mapView')?.classList.remove('hidden');
+                document.getElementById('btnMap')?.classList.add('bg-red-700');
+                document.getElementById('btnMap')?.classList.remove('bg-red-600');
+                showMapForDate('today');
+            } else if (view === 'calendar') {
+                document.getElementById('calendarView')?.classList.remove('hidden');
+                document.getElementById('btnCalendar')?.classList.add('bg-purple-700');
+                document.getElementById('btnCalendar')?.classList.remove('bg-purple-600');
+                if (!calendar) {
+                    initCalendar();
+                }
+            } else {
+                document.getElementById('tableView')?.classList.remove('hidden');
+                document.getElementById('btnTable')?.classList.add('bg-gray-700');
+                document.getElementById('btnTable')?.classList.remove('bg-gray-600');
+            }
+        }
+
+        // Initialiser le calendrier FullCalendar
+        function initCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'fr',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                buttonText: {
+                    today: 'Aujourd\'hui',
+                    month: 'Mois',
+                    week: 'Semaine',
+                    day: 'Jour'
+                },
+                events: convertClientsToEvents(),
+                eventClick: function(info) {
+                    const clientId = info.event.extendedProps.clientId;
+                    editClient(clientId);
+                },
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                },
+                height: 'auto',
+                eventDisplay: 'block',
+                eventColor: function(info) {
+                    const status = info.event.extendedProps.status;
+                    const colors = {
+                        'planifié': '#3b82f6',    // bleu
+                        'en_route': '#eab308',     // jaune
+                        'commence': '#f97316',     // orange
+                        'termine': '#22c55e'       // vert
+                    };
+                    return colors[status] || '#6b7280';
+                }
+            });
+            
+            calendar.render();
+        }
+
+        // Convertir les clients en événements pour le calendrier
+        function convertClientsToEvents() {
+            return clients.map(client => {
+                const date = client.date_intervention;
+                const heureDebut = client.heure_debut || '00:00';
+                const heureFin = client.heure_fin || heureDebut;
+                
+                // Créer les dates de début et fin
+                const start = new Date(`${date}T${heureDebut}`);
+                const end = new Date(`${date}T${heureFin}`);
+                
+                // Si pas d'heure de fin, ajouter 1 heure par défaut
+                if (!client.heure_fin) {
+                    end.setHours(end.getHours() + 1);
+                }
+                
+                return {
+                    id: client.id,
+                    title: `${client.nom} - ${client.adresse}`,
+                    start: start.toISOString(),
+                    end: end.toISOString(),
+                    extendedProps: {
+                        clientId: client.id,
+                        status: client.status,
+                        telephone: client.telephone,
+                        email: client.email,
+                        adresse: client.adresse
+                    },
+                    backgroundColor: getStatusColor(client.status),
+                    borderColor: getStatusColor(client.status),
+                    textColor: '#ffffff'
+                };
+            });
+        }
+
+        // Obtenir la couleur selon le statut
+        function getStatusColor(status) {
+            const colors = {
+                'planifié': '#3b82f6',    // bleu
+                'en_route': '#eab308',     // jaune
+                'commence': '#f97316',     // orange
+                'termine': '#22c55e'       // vert
+            };
+            return colors[status] || '#6b7280';
+        }
+
+        // Mettre à jour le calendrier
+        function updateCalendar() {
+            if (calendar) {
+                calendar.removeAllEvents();
+                calendar.addEventSource(convertClientsToEvents());
+            }
+        }
+
+        // Afficher les clients dans le tableau
+        function renderClients() {
+            const tbody = document.getElementById('clientsTable');
+            if (clients.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Aucun client</td></tr>';
+                return;
+            }
+            
+            // Filtrer les clients
+            filteredClients = filterClientsList(clients);
+            
+            if (filteredClients.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Aucun client ne correspond aux filtres</td></tr>';
+                updateFilterCount(0, clients.length);
+                return;
+            }
+            
+            updateFilterCount(filteredClients.length, clients.length);
+
+            tbody.innerHTML = filteredClients.map(client => {
+                const statusClass = {
+                    'planifié': 'status-planifie',
+                    'en_route': 'status-en_route',
+                    'commence': 'status-commence',
+                    'termine': 'status-termine'
+                }[client.status] || 'bg-gray-100 text-gray-800';
+
+                const statusLabel = {
+                    'planifié': 'Planifié',
+                    'en_route': 'En route',
+                    'commence': 'Commencé',
+                    'termine': 'Terminé'
+                }[client.status] || client.status;
+
+                const heureDebut = formatTime(client.heure_debut);
+                const heureFin = client.heure_fin ? ` - ${formatTime(client.heure_fin)}` : '';
+                const adresseEncoded = encodeURIComponent(client.adresse);
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="font-semibold text-gray-900">${escapeHtml(client.nom)}</div>
+                            <div class="text-sm text-gray-500">${escapeHtml(client.telephone)}</div>
+                            ${client.email ? `<div class="text-sm text-gray-500">${escapeHtml(client.email)}</div>` : ''}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900 mb-2">${escapeHtml(client.adresse)}</div>
+                            <div onclick="showMap('${adresseEncoded}', '${escapeHtml(client.nom)}')" 
+                                 class="cursor-pointer hover:opacity-80 transition rounded overflow-hidden border-2 border-gray-300 hover:border-blue-500"
+                                 style="width: 200px; height: 120px;">
+                                <iframe 
+                                    width="200" 
+                                    height="120" 
+                                    style="border:0; pointer-events: none;" 
+                                    loading="lazy" 
+                                    allowfullscreen
+                                    src="https://www.google.com/maps?q=${adresseEncoded}&output=embed&zoom=15">
+                                </iframe>
+                            </div>
+                            <button onclick="showMap('${adresseEncoded}', '${escapeHtml(client.nom)}')" 
+                                    class="mt-2 text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1">
+                                🔍 Agrandir la carte
+                            </button>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                ${client.type_service || 'Non spécifié'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">${formatDate(client.date_intervention)}</div>
+                            <div class="text-sm text-gray-500">${heureDebut}${heureFin}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                                ${statusLabel}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <div class="flex flex-col gap-2">
+                                ${client.status === 'planifié' ? `
+                                    <button onclick="updateStatus(${client.id}, 'en_route')" 
+                                            class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                        En route
+                                    </button>
+                                ` : ''}
+                                ${client.status === 'en_route' ? `
+                                    <button onclick="updateStatus(${client.id}, 'commence')" 
+                                            class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                        Commencé
+                                    </button>
+                                ` : ''}
+                                ${client.status === 'commence' ? `
+                                    <button onclick="updateStatus(${client.id}, 'termine')" 
+                                            class="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                        Terminé
+                                    </button>
+                                ` : ''}
+                                <button onclick="editClient(${client.id})" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                    Modifier
+                                </button>
+                                ${client.email ? `
+                                    <button onclick="sendTestEmail(${client.id})" 
+                                            class="bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                        📧 Email test
+                                    </button>
+                                ` : ''}
+                                <button onclick="deleteClient(${client.id})" 
+                                        class="bg-red-500 hover:bg-red-600 text-white text-xs font-semibold py-1 px-3 rounded transition">
+                                    Supprimer
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Ouvrir modal ajout
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Ajouter un client';
+            document.getElementById('clientForm').reset();
+            document.getElementById('clientId').value = '';
+            document.getElementById('clientModal').classList.remove('hidden');
+        }
+
+        // Fermer modal
+        function closeModal() {
+            document.getElementById('clientModal').classList.add('hidden');
+        }
+
+        // Éditer un client
+        async function editClient(id) {
+            const client = clients.find(c => c.id === id);
+            if (!client) return;
+
+            document.getElementById('modalTitle').textContent = 'Modifier le client';
+            document.getElementById('clientId').value = client.id;
+            document.getElementById('nom').value = client.nom;
+            document.getElementById('adresse').value = client.adresse;
+            document.getElementById('telephone').value = client.telephone;
+            document.getElementById('email').value = client.email || '';
+            document.getElementById('date_intervention').value = client.date_intervention;
+            document.getElementById('heure_debut').value = client.heure_debut;
+            document.getElementById('heure_fin').value = client.heure_fin || '';
+            document.getElementById('clientModal').classList.remove('hidden');
+        }
+
+        // Sauvegarder client
+        async function saveClient(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('clientId').value;
+            const data = {
+                nom: document.getElementById('nom').value,
+                adresse: document.getElementById('adresse').value,
+                telephone: document.getElementById('telephone').value,
+                email: document.getElementById('email').value,
+                date_intervention: document.getElementById('date_intervention').value,
+                heure_debut: document.getElementById('heure_debut').value,
+                heure_fin: document.getElementById('heure_fin').value || null,
+                type_service: document.getElementById('type_service').value || null
+            };
+
+            try {
+                if (id) {
+                    // Mise à jour
+                    await fetch(`/api/clients/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Création
+                    await fetch('/api/clients', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+                closeModal();
+                await loadClients();
+            } catch (error) {
+                console.error('Erreur sauvegarde:', error);
+                alert('Erreur lors de la sauvegarde');
+            }
+        }
+
+        // Mettre à jour le statut
+        async function updateStatus(id, status) {
+            if (!confirm('Changer le statut et envoyer la notification ?')) return;
+
+            try {
+                const response = await fetch(`/api/clients/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                
+                if (response.ok) {
+                    await loadClients();
+                    if (calendar) {
+                        updateCalendar();
+                    }
+                    alert('Statut mis à jour et notification envoyée');
+                }
+            } catch (error) {
+                console.error('Erreur mise à jour statut:', error);
+                alert('Erreur lors de la mise à jour');
+            }
+        }
+
+        // Supprimer client
+        async function deleteClient(id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) return;
+
+            try {
+                await fetch(`/api/clients/${id}`, { method: 'DELETE' });
+                await loadClients();
+                if (calendar) {
+                    updateCalendar();
+                }
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                alert('Erreur lors de la suppression');
+            }
+        }
+
+        // Envoyer un email de test
+        async function sendTestEmail(id) {
+            if (!confirm('Envoyer un email de test à ce client ?')) return;
+
+            try {
+                const response = await fetch(`/api/clients/${id}/test-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.sent) {
+                    alert('✅ Email de test envoyé avec succès !');
+                } else {
+                    alert('❌ Erreur : ' + (data.error || data.message || 'Impossible d\'envoyer l\'email'));
+                }
+            } catch (error) {
+                console.error('Erreur envoi email test:', error);
+                alert('Erreur lors de l\'envoi de l\'email de test');
+            }
+        }
+
+        // Utilitaires
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const [h, m] = timeStr.split(':');
+            return `${parseInt(h)}h${m || '00'}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Afficher la carte Google Maps
+        function showMap(adresseEncoded, nomClient) {
+            // Utiliser Google Maps Embed sans clé API (méthode alternative)
+            const mapUrl = `https://www.google.com/maps?q=${adresseEncoded}&output=embed`;
+            const mapLinkUrl = `https://www.google.com/maps/search/?api=1&query=${adresseEncoded}`;
+            
+            document.getElementById('mapTitle').textContent = `Carte - ${nomClient}`;
+            document.getElementById('mapFrame').src = mapUrl;
+            document.getElementById('mapLink').href = mapLinkUrl;
+            document.getElementById('mapModal').classList.remove('hidden');
+        }
+
+        // Fermer la modal de la carte
+        function closeMapModal() {
+            document.getElementById('mapModal').classList.add('hidden');
+            document.getElementById('mapFrame').src = '';
+        }
+
+        // Fermer la modal si on clique en dehors
+        document.getElementById('mapModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeMapModal();
+            }
+        });
+
+        // Filtrer la liste des clients
+        function filterClientsList(clientsList) {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('filterStatus').value;
+            const typeServiceFilter = document.getElementById('filterTypeService').value;
+            const dateFilter = document.getElementById('filterDate').value;
+            
+            return clientsList.filter(client => {
+                // Recherche textuelle
+                if (search) {
+                    const searchText = `${client.nom} ${client.adresse} ${client.telephone} ${client.email || ''}`.toLowerCase();
+                    if (!searchText.includes(search)) return false;
+                }
+                
+                // Filtre statut
+                if (statusFilter && client.status !== statusFilter) return false;
+                
+                // Filtre type de service
+                if (typeServiceFilter && client.type_service !== typeServiceFilter) return false;
+                
+                // Filtre date
+                if (dateFilter && client.date_intervention !== dateFilter) return false;
+                
+                return true;
+            });
+        }
+        
+        // Appliquer les filtres
+        function filterClients() {
+            renderClients();
+        }
+        
+        // Effacer tous les filtres
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterTypeService').value = '';
+            document.getElementById('filterDate').value = '';
+            filterClients();
+        }
+        
+        // Mettre à jour le compteur de filtres
+        function updateFilterCount(filtered, total) {
+            const countEl = document.getElementById('filterCount');
+            if (filtered === total) {
+                countEl.textContent = `Affichage de ${total} client${total > 1 ? 's' : ''}`;
+            } else {
+                countEl.textContent = `Affichage de ${filtered} sur ${total} client${total > 1 ? 's' : ''}`;
+            }
+        }
+        
+        // Mettre à jour les statistiques
+        function updateStats() {
+            const today = new Date().toISOString().split('T')[0];
+            const total = clients.length;
+            const termines = clients.filter(c => c.status === 'termine').length;
+            const enCours = clients.filter(c => ['en_route', 'commence'].includes(c.status)).length;
+            const aujourdhui = clients.filter(c => c.date_intervention === today).length;
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statTermines').textContent = termines;
+            document.getElementById('statEnCours').textContent = enCours;
+            document.getElementById('statAujourdhui').textContent = aujourdhui;
+            
+            // Graphique Statuts
+            const statusCounts = {
+                'planifié': clients.filter(c => c.status === 'planifié').length,
+                'en_route': clients.filter(c => c.status === 'en_route').length,
+                'commence': clients.filter(c => c.status === 'commence').length,
+                'termine': clients.filter(c => c.status === 'termine').length
+            };
+            
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(document.getElementById('statusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Planifié', 'En route', 'Commencé', 'Terminé'],
+                    datasets: [{
+                        data: [statusCounts.planifié, statusCounts.en_route, statusCounts.commence, statusCounts.termine],
+                        backgroundColor: ['#3b82f6', '#eab308', '#f97316', '#22c55e']
+                    }]
+                }
+            });
+            
+            // Graphique Types de Service
+            const serviceCounts = {};
+            clients.forEach(c => {
+                const type = c.type_service || 'Non spécifié';
+                serviceCounts[type] = (serviceCounts[type] || 0) + 1;
+            });
+            
+            if (serviceChart) serviceChart.destroy();
+            serviceChart = new Chart(document.getElementById('serviceChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(serviceCounts),
+                    datasets: [{
+                        label: 'Nombre',
+                        data: Object.values(serviceCounts),
+                        backgroundColor: '#3b82f6'
+                    }]
+                }
+            });
+            
+            // Graphique 7 derniers jours
+            const last7Days = [];
+            const dailyCounts = {};
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+                last7Days.push(dateStr);
+                dailyCounts[dateStr] = clients.filter(c => c.date_intervention === dateStr).length;
+            }
+            
+            if (dailyChart) dailyChart.destroy();
+            dailyChart = new Chart(document.getElementById('dailyChart'), {
+                type: 'line',
+                data: {
+                    labels: last7Days.map(d => new Date(d).toLocaleDateString('fr-FR', { weekday: 'short' })),
+                    datasets: [{
+                        label: 'Interventions',
+                        data: last7Days.map(d => dailyCounts[d] || 0),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }]
+                }
+            });
+            
+            // Graphique Taux de Complétion
+            const completionRate = total > 0 ? (termines / total * 100).toFixed(1) : 0;
+            if (completionChart) completionChart.destroy();
+            completionChart = new Chart(document.getElementById('completionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Terminés', 'En cours'],
+                    datasets: [{
+                        data: [termines, total - termines],
+                        backgroundColor: ['#22c55e', '#e5e7eb']
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': ' + context.parsed + ' (' + (context.parsed / total * 100).toFixed(1) + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Afficher la carte globale
+        function showMapForDate(filter) {
+            let clientsToShow = clients;
+            
+            if (filter === 'today') {
+                const today = new Date().toISOString().split('T')[0];
+                clientsToShow = clients.filter(c => c.date_intervention === today);
+            } else if (filter === 'custom') {
+                const date = document.getElementById('mapDateFilter').value;
+                clientsToShow = clients.filter(c => c.date_intervention === date);
+            }
+            
+            const mapContainer = document.getElementById('globalMap');
+            mapContainer.innerHTML = '';
+            
+            if (clientsToShow.length === 0) {
+                mapContainer.innerHTML = '<div class="text-center p-8 text-gray-500">Aucun client à afficher</div>';
+                return;
+            }
+            
+            // Créer l'URL Google Maps avec tous les clients
+            const addresses = clientsToShow.map(c => encodeURIComponent(c.adresse)).join('|');
+            const mapUrl = `https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6d-s6M4kZfa5eE&zoom=12&center=${encodeURIComponent(clientsToShow[0].adresse)}`;
+            
+            // Alternative sans clé API
+            const embedUrl = `https://www.google.com/maps?q=${encodeURIComponent(clientsToShow[0].adresse)}&output=embed`;
+            
+            const iframe = document.createElement('iframe');
+            iframe.width = '100%';
+            iframe.height = '600';
+            iframe.style.border = '0';
+            iframe.src = embedUrl;
+            mapContainer.appendChild(iframe);
+            
+            // Supprimer l'ancienne liste si elle existe
+            const oldList = mapContainer.parentElement.querySelector('.clients-list-map');
+            if (oldList) oldList.remove();
+            
+            // Ajouter une liste des adresses
+            const listDiv = document.createElement('div');
+            listDiv.className = 'clients-list-map mt-4 grid grid-cols-1 md:grid-cols-3 gap-2';
+            listDiv.innerHTML = clientsToShow.map(c => {
+                const statusColors = {
+                    'planifié': { bg: 'bg-blue-50', border: 'border-blue-500' },
+                    'en_route': { bg: 'bg-yellow-50', border: 'border-yellow-500' },
+                    'commence': { bg: 'bg-orange-50', border: 'border-orange-500' },
+                    'termine': { bg: 'bg-green-50', border: 'border-green-500' }
+                };
+                const colors = statusColors[c.status] || { bg: 'bg-gray-50', border: 'border-gray-500' };
+                return `
+                    <div class="p-2 ${colors.bg} rounded border-l-4 ${colors.border}">
+                        <div class="font-semibold">${escapeHtml(c.nom)}</div>
+                        <div class="text-sm text-gray-600">${escapeHtml(c.adresse)}</div>
+                        <div class="text-xs text-gray-500">${c.heure_debut}</div>
+                    </div>
+                `;
+            }).join('');
+            mapContainer.parentElement.appendChild(listDiv);
+        }
+        
+        // Export PDF
+        function exportPDF() {
+            const today = new Date().toISOString().split('T')[0];
+            const clientsToday = clients.filter(c => c.date_intervention === today);
+            
+            // Créer le contenu HTML pour le PDF
+            let htmlContent = `
+                <html>
+                <head>
+                    <title>Rapport Déneigement - ${today}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { color: #333; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Rapport Déneigement - ${new Date(today).toLocaleDateString('fr-FR')}</h1>
+                    <p><strong>Total interventions: ${clientsToday.length}</strong></p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Adresse</th>
+                                <th>Heure</th>
+                                <th>Statut</th>
+                                <th>Type Service</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            clientsToday.forEach(client => {
+                htmlContent += `
+                    <tr>
+                        <td>${escapeHtml(client.nom)}</td>
+                        <td>${escapeHtml(client.adresse)}</td>
+                        <td>${client.heure_debut}${client.heure_fin ? ' - ' + client.heure_fin : ''}</td>
+                        <td>${client.status}</td>
+                        <td>${client.type_service || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            
+            htmlContent += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            
+            // Ouvrir dans une nouvelle fenêtre pour impression
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            printWindow.focus();
+            
+            // Attendre que le contenu soit chargé puis imprimer
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        }
+        
+        // Initialisation
+        loadClients();
+    </script>
+    </div>
+</body>
+</html>
+
