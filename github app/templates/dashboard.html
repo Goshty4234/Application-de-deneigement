@@ -1011,30 +1011,49 @@
         
         // Export PDF
         function exportPDF() {
-            const today = new Date().toISOString().split('T')[0];
-            const clientsToday = clients.filter(c => c.date_intervention === today);
+            // Utiliser TOUS les clients, pas seulement ceux d'aujourd'hui
+            const allClients = clients;
+            const today = new Date().toLocaleDateString('fr-FR');
+            
+            // Trier les clients par date d'intervention
+            const sortedClients = [...allClients].sort((a, b) => {
+                if (a.date_intervention !== b.date_intervention) {
+                    return a.date_intervention.localeCompare(b.date_intervention);
+                }
+                return a.heure_debut.localeCompare(b.heure_debut);
+            });
             
             // Créer le contenu HTML pour le PDF
             let htmlContent = `
                 <html>
                 <head>
-                    <title>Rapport Déneigement - ${today}</title>
+                    <title>Rapport Déneigement - Tous les Clients</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; }
                         h1 { color: #333; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        .report-date { color: #666; font-size: 14px; margin-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
                         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f2f2f2; }
+                        th { background-color: #f2f2f2; font-weight: bold; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .status-planifie { background-color: #dbeafe; }
+                        .status-en_route { background-color: #fef3c7; }
+                        .status-commence { background-color: #fed7aa; }
+                        .status-termine { background-color: #d1fae5; }
                     </style>
                 </head>
                 <body>
-                    <h1>Rapport Déneigement - ${new Date(today).toLocaleDateString('fr-FR')}</h1>
-                    <p><strong>Total interventions: ${clientsToday.length}</strong></p>
+                    <h1>Rapport Déneigement - Tous les Clients</h1>
+                    <p class="report-date">Généré le ${today}</p>
+                    <p><strong>Total interventions: ${sortedClients.length}</strong></p>
                     <table>
                         <thead>
                             <tr>
+                                <th>Date</th>
                                 <th>Client</th>
                                 <th>Adresse</th>
+                                <th>Téléphone</th>
+                                <th>Email</th>
                                 <th>Heure</th>
                                 <th>Statut</th>
                                 <th>Type Service</th>
@@ -1043,11 +1062,16 @@
                         <tbody>
             `;
             
-            clientsToday.forEach(client => {
+            sortedClients.forEach(client => {
+                const statusClass = `status-${client.status.replace('é', 'e')}`;
+                const dateFormatted = new Date(client.date_intervention + 'T00:00:00').toLocaleDateString('fr-FR');
                 htmlContent += `
-                    <tr>
+                    <tr class="${statusClass}">
+                        <td>${dateFormatted}</td>
                         <td>${escapeHtml(client.nom)}</td>
                         <td>${escapeHtml(client.adresse)}</td>
+                        <td>${escapeHtml(client.telephone)}</td>
+                        <td>${escapeHtml(client.email || 'N/A')}</td>
                         <td>${client.heure_debut}${client.heure_fin ? ' - ' + client.heure_fin : ''}</td>
                         <td>${client.status}</td>
                         <td>${client.type_service || 'N/A'}</td>
@@ -1076,6 +1100,8 @@
         
         // Initialisation
         loadClients();
+        // Afficher la vue tableau par défaut
+        showView('table');
     </script>
     </div>
 </body>
